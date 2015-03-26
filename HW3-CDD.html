@@ -1,0 +1,291 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+	body {
+		background-color: #fff;
+		color: #111;
+		margin: 0px;
+		overflow: hidden;
+		font-family: Monospace;
+		font-size: 20px;
+	}
+	#info {
+		position: absolute;
+		top: 0px; width: 100%;
+		
+		padding: 5px;
+		text-align: center;
+		color: #ffff00
+	}
+	a {color: #00ffff}
+	strong {color:red}
+	
+	#container{
+	    z-index: 0; left:0px; top:0px;
+	    overflow: hidden;
+	    position: absolute;
+
+	    width: 100%;
+	    height: 100%;
+    }	
+</style>
+</head>
+
+<body> 
+
+<div id="container"></div>
+<div id="info">
+    HW3 <br/>
+</div>
+
+
+<script src="js/r69/three.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/KeyboardState.js"></script>
+<script src="js/ccd.js"></script>
+
+<script>
+var scene, renderer, camera;
+var controls;
+var keyboard = new KeyboardState();
+var arm, arm2;
+
+var theta1 = 0, theta2 = 0;
+var boxMaterial, boxMaterial2;
+var container;
+var clock = new THREE.Clock();
+
+var mouse = new THREE.Vector2();
+
+var speed = 500;
+var Cend = new THREE.Vector3();
+var pos = new THREE.Vector3(0,0,-100);
+var end,start,ball,dis = 0;
+var target = new THREE.Vector3();
+var dir = new THREE.Vector3();
+var tmp = new THREE.Vector3();
+var dt;
+init();
+animate();
+
+function init()
+{
+	container = document.getElementById ("container");
+	var width = container.clientWidth;
+	var height = container.clientHeight;
+
+	renderer = new THREE.WebGLRenderer({antialias: true});
+	renderer.setSize (width, height);
+	renderer.setClearColor (0x888888);
+
+	scene = new THREE.Scene();
+
+	camera = new THREE.PerspectiveCamera (45, width/height, 1, 10000);
+	camera.position.y = 160;
+	camera.position.z = 400;
+	camera.lookAt (new THREE.Vector3(0,0,0));
+
+	container.appendChild (renderer.domElement); 
+	controls = new THREE.OrbitControls (camera, renderer.domElement, container);
+
+	// first link
+	var boxGeometry = new THREE.BoxGeometry (50, 10,10);
+	boxMaterial = new THREE.MeshLambertMaterial ({color: 0x222222, wireframe:false});
+	var armMesh = new THREE.Mesh (boxGeometry, boxMaterial);
+	arm = new THREE.Object3D();
+	arm.add (armMesh);
+	armMesh.translateOnAxis (new THREE.Vector3(1,0,0), 50/2);
+	scene.add (arm);
+
+	// second link
+	boxGeometry = new THREE.BoxGeometry (75, 10,10);
+	boxMaterial2 = new THREE.MeshLambertMaterial ({color: 0x222222, wireframe:false});
+	var armMesh2 = new THREE.Mesh (boxGeometry, boxMaterial2);
+	arm2 = new THREE.Object3D();
+	arm2.add (armMesh2);
+	arm2.translateOnAxis (new THREE.Vector3(1,0,0), 50);
+	armMesh2.translateOnAxis (new THREE.Vector3(1,0,0), 75/2);
+	arm.add (arm2);
+
+	// end effector
+	var cyl_geom = new THREE.CylinderGeometry (10,10,6,32);
+	var cyl_mat = new THREE.MeshLambertMaterial ({color: 0xff2211});
+	end = new THREE.Mesh (cyl_geom, cyl_mat);
+	end.translateOnAxis (new THREE.Vector3(1,0,0), 75);
+	arm2.add (end);
+	
+	// start effector
+	var cyl_geom = new THREE.CylinderGeometry (10,10,6,32);
+	var cyl_mat = new THREE.MeshLambertMaterial ({color: 0x222222});
+	start = new THREE.Mesh (cyl_geom, cyl_mat);
+	scene.add (start);
+
+	var cyl_geom = new THREE.CylinderGeometry (15,15,6,32);
+	var cyl_mat = new THREE.MeshLambertMaterial ({color: 0xffffff});
+	ball = new THREE.Mesh (cyl_geom, cyl_mat);
+	scene.add (ball);
+	
+	wall();
+	floor();
+	skybox();
+
+    var pointLight = new THREE.PointLight( 0xffffff);
+	pointLight.position.set(0,10000000,-240);
+    scene.add( pointLight );
+
+
+	window.addEventListener ('resize', onWindowResize, false);	
+	renderer.domElement.addEventListener ('mousemove', onDocumentMouseMove, false);
+}
+
+function wall(){
+	var ang = 90*3.14159/180;
+	
+	var wallGeometry = new THREE.BoxGeometry (5,15,300);
+	var wallGeometry1 = new THREE.BoxGeometry (5,15,500);
+	var wallMaterial = new THREE.MeshLambertMaterial ({color: 0x000000, wireframe:false});
+	var wallMesh = new THREE.Mesh (wallGeometry, wallMaterial);
+	var wallMesh2 = new THREE.Mesh (wallGeometry1, wallMaterial);
+	var wallMesh3 = new THREE.Mesh (wallGeometry, wallMaterial);
+	var wallMesh4 = new THREE.Mesh (wallGeometry1, wallMaterial);
+	wallS = new THREE.Object3D();
+	wallS.add (wallMesh);
+	wallS.translateOnAxis (new THREE.Vector3(0,0,1), 10);
+	wallS.rotateOnAxis (new THREE.Vector3(0,1,0), ang);
+	scene.add (wallS);
+	
+	wallN = new THREE.Object3D();
+	wallN.add (wallMesh3);
+	wallN.translateOnAxis (new THREE.Vector3(0,0,-1), 490);
+	wallN.rotateOnAxis (new THREE.Vector3(0,1,0), ang);
+	scene.add (wallN);
+	
+	wallE = new THREE.Object3D();
+	wallE.add (wallMesh2);
+	wallE.translateOnAxis (new THREE.Vector3(1,0,0), 150);
+	wallE.translateOnAxis (new THREE.Vector3(0,0,-1), 240);
+	scene.add (wallE);
+
+	wallW = new THREE.Object3D();
+	wallW.add (wallMesh4);
+	wallW.translateOnAxis (new THREE.Vector3(-1,0,0), 150);
+	wallW.translateOnAxis (new THREE.Vector3(0,0,-1), 240);
+	scene.add (wallW);
+}
+
+function skybox(){
+	var imagePrefix = "image/nebula-";
+	var directions  = ["xpos", "xneg", "ypos", "yneg", "zpos", "zneg"];
+	var imageSuffix = ".png";
+	var skyGeometry = new THREE.CubeGeometry( 5000, 5000, 5000 );	
+	
+	var materialArray = [];
+	for (var i = 0; i < 6; i++)
+		materialArray.push( new THREE.MeshBasicMaterial({
+			map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+			side: THREE.BackSide
+		}));
+	var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+	var skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+	scene.add( skyBox );
+}
+
+function floor(){
+
+	var floorTex = THREE.ImageUtils.loadTexture("image/Universe.jpg")
+    var plane = new THREE.Mesh(new THREE.BoxGeometry(300, 1, 500), new THREE.MeshPhongMaterial({color: 0x3c3c3c, map: floorTex}));
+	plane.translateOnAxis (new THREE.Vector3(0,0,-1), 240);
+	plane.translateOnAxis (new THREE.Vector3(0,-1,0), 7.5);
+    scene.add(plane);
+}
+
+function onDocumentMouseMove( event ) {
+	event.preventDefault();
+	mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+	mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+	// tracer: find intersection on xz plane
+	var depth0 = new THREE.Vector3( mouse.x, mouse.y, 0.0 ).unproject( camera );
+	var depth1 = new THREE.Vector3( mouse.x, mouse.y, 1.0 ).unproject( camera );
+	//debugger;
+	var t = depth0.y / (depth0.y - depth1.y);
+	var x = depth0.x + t * (depth1.x - depth0.x);
+	var z = depth0.z + t * (depth1.z - depth0.z);
+	target.set (x,0,z);
+}
+
+
+
+function animate()
+{		
+	dt = clock.getDelta();
+
+	tmp.subVectors(pos, Cend);
+	dis = tmp.length();
+	
+
+	if( pos.x > 135 ){ 
+		dir.x = -1 * dir.x;
+	}
+	if( pos.x < -135 ){ 
+		dir.x = -1 * dir.x;
+	}
+	if( pos.z < -475 ){ 
+		dir.z = -1 * dir.z;	
+	}
+	if( pos.z > -5 ){ 
+		dir.z = -1 * dir.z;	
+	}
+
+	pos.add (dir);	
+
+	ball.position.set (pos.x, pos.y, pos.z);
+
+	requestAnimationFrame ( animate );  // timer callback
+	update();
+	render();  // display callback
+}
+
+function collision(){
+	dir.copy(tmp.normalize());
+	dir.multiplyScalar (dt*speed);	
+	 
+}
+
+function update()
+{
+	keyboard.update();
+	controls.update();
+	
+	if( dis <= 25.5 ){
+		speed = 500;
+		collision();
+	}
+	var theta = [theta1, theta2]; // for call-by-reference
+	ik_ccd (target, theta);
+
+}
+
+function onWindowResize()
+{
+	var width = container.clientWidth;
+	var height = container.clientHeight;
+	camera.aspect = width / height;
+	camera.updateProjectionMatrix();
+	renderer.setSize (width, height);
+}
+
+
+function render()
+{
+	arm.rotation.y = theta1;
+	arm2.rotation.y = theta2;
+
+	renderer.render (scene, camera);
+}
+</script>
+</body>
+
+</html>

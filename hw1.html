@@ -1,0 +1,203 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+	body {
+		background-color: #fff;
+		color: #111;
+		margin: 0px;
+		overflow: hidden;
+		font-family: Monospace;
+		font-size: 20px;
+		position: absolute;
+	}
+	
+	#info {
+		position: absolute;
+		top: 20px; width: 100%;
+		
+		padding: 5px;
+		text-align: center;
+		color: #ffff00
+	}
+	strong {color:red}
+	a {color: purple}
+	
+</style>
+</head>
+
+<body> 
+<div id="info">
+    HW1 <br/>
+	Type <strong>z</strong> to toggle spin  <br/>
+	stop/start BGM (<a href="javascript:pauseM();"> Music!</a>)
+	
+</div>
+
+<audio id="BGM" autoplay loop style="display:none">
+<source src="sounds/FF2 - The Rebel Army.mp3" type='audio/mp3'>
+</audio>
+
+<script src="js/r69/three.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/KeyboardState.js"></script>
+
+<script>
+var camera, scene,sceneBack, cameraBack, renderer, sun, earth, vEarth, angleE = 0,
+    clock, control, keyboard = new KeyboardState();
+var toggle = 1;
+var BGM;
+var isPaused = false, soundVal = 1.0, sign = 1.0;
+
+init();
+animate();
+
+function pauseM() {
+	isPaused = !isPaused;
+	sign = isPaused ? -1 : 1;
+}
+
+function init() {
+	BGM = document.getElementById ('BGM');
+	
+	//BackScene
+	sceneBack = new THREE.Scene();
+    cameraBack = new THREE.OrthographicCamera(-25, 25, 25, -25, 1, 250);
+    cameraBack.position.z = 12.5;
+    cameraBack.lookAt(new THREE.Vector3(0, 0, 0));
+
+
+    var texture = THREE.ImageUtils.loadTexture('image/galaxy.jpg');
+
+    var back = new THREE.Mesh(new THREE.PlaneGeometry(50, 50),
+    new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.715
+    }));
+    back.material.depthTest = false;
+    back.material.depthWrite = false;
+    sceneBack.add(back);
+
+	var texture1 = THREE.ImageUtils.loadTexture('image/eye.png');
+    var front = new THREE.Mesh(new THREE.PlaneGeometry(10, 10),
+    new THREE.MeshBasicMaterial({
+        map: texture1,
+        transparent: true,
+		opacity: 0.815
+    }));
+	front.material.depthTest = false;
+	front.material.depthWrite = false;
+	front.position.set(0,15,10);
+	
+    sceneBack.add(front);
+
+	//Scene
+    clock = new THREE.Clock();
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 100000);
+    camera.position.z = 500;
+    scene.add(camera);
+
+	
+	
+	//sun
+	var sunGeom =  new THREE.SphereGeometry(40,30,30); 
+	var sunTexture = THREE.ImageUtils.loadTexture( 'image/sun.jpg' );
+	var sunMaterial = new THREE.MeshBasicMaterial( { map: sunTexture } );
+	sun = new THREE.Mesh( sunGeom.clone(), sunMaterial );
+    scene.add(sun);
+	
+	//earth
+	var earthGeom =  new THREE.SphereGeometry(20,30,30);
+	var earthTexture = THREE.ImageUtils.loadTexture( 'image/earth.jpg' );
+	var earthMaterial = new THREE.MeshBasicMaterial( { map: earthTexture } );
+	earth = new THREE.Mesh( earthGeom.clone(), earthMaterial );
+	vEarth = new THREE.Mesh( new THREE.SphereGeometry(1), earthMaterial );
+    sun.add(earth);
+	//sun.add(vEarth);
+	
+	//moon
+	var moonGeom =  new THREE.SphereGeometry(6,30,30);
+	var moonTexture = THREE.ImageUtils.loadTexture( 'image/moon.jpg' );
+	var moonMaterial = new THREE.MeshBasicMaterial( { map: moonTexture } );
+	moon = new THREE.Mesh( moonGeom.clone(), moonMaterial );
+	//vEarth.add(moon);
+	earth.add(moon);
+ 
+
+    renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x111111);
+
+	//skybox();
+	
+	renderer.autoClear = false;
+	
+    control = new THREE.OrbitControls(camera, renderer.domElement);
+    document.body.appendChild(renderer.domElement);
+    window.addEventListener('resize', onWindowResize, false);
+}
+
+function skybox(){
+	var imagePrefix = "image/nebula-";
+	var directions  = ["xpos", "xneg", "ypos", "yneg", "zpos", "zneg"];
+	var imageSuffix = ".png";
+	var skyGeometry = new THREE.CubeGeometry( 5000, 5000, 5000 );	
+
+	var materialArray = [];
+	for (var i = 0; i < 6; i++)
+		materialArray.push( new THREE.MeshBasicMaterial({
+			map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+			side: THREE.BackSide
+		}));
+	var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+	var SkyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+	scene.add( SkyBox );
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate() {
+	keyboard.update();
+    control.update();
+	
+	soundVal += sign*0.01;
+	soundVal = THREE.Math.clamp (soundVal, 0, 1);
+	BGM.volume = soundVal;
+	
+	if ( keyboard.down("Z"))  
+		toggle ^= 1; 
+    requestAnimationFrame(animate);
+    render();
+}
+
+function render() {
+	angleE = clock.getElapsedTime()/180*3.1416;
+    var angleM = angleE*12;
+	var angleER = angleE*365;
+	
+	if( toggle ){
+		earth.position.set(160 * Math.cos(angleE), 0, -160 * Math.sin(angleE));
+		//vEarth.position.set(160 * Math.cos(angle), 0, -160 * Math.sin(angle));
+		earth.rotation.y = angleER;
+		
+		moon.position.set(40 * Math.cos(angleM - angleER), 0, -40 * Math.sin(angleM - angleER));
+		moon.rotation.y = angleM - angleER;
+	}
+	
+	renderer.clear();
+	renderer.render(sceneBack, cameraBack);
+	renderer.render(scene, camera);
+    
+}
+</script>
+</body>
+
+</html>
