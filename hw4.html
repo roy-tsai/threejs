@@ -1,0 +1,488 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+	body {
+		background-color: #fff;
+		color: #111;
+		margin: 0px;
+		overflow: hidden;
+		font-family: Monospace;
+		font-size: 20px;
+		position: absolute;
+	}
+	
+	#info {
+		position: absolute;
+		top: 20px; width: 100%;
+		
+		padding: 5px;
+		text-align: center;
+		color: #ffff00
+	}
+	strong {color:red}
+	a {color: purple}
+	
+</style>
+</head>
+
+<body> 
+<div id="info">
+    HW4 </br>
+	Press <strong>Arrow keys</strong> to control</br>
+	Click (<a href="javascript:t3rdV();"> view1</a>) to change 3rd, (<a href="javascript:globalV();"> view2</a>) to global,
+	(<a href="javascript:originalV();"> view</a>) to comeback. 
+	
+	
+</div>
+
+<script src="js/r69/three.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/KeyboardState.js"></script>
+
+<script>
+var clock = new THREE.Clock();
+var camera, camera, scene, renderer, 
+    control, keyboard = new KeyboardState();
+	
+var car, tireL, tireR, body, board, head, floor, light;
+var sa = 0, sb = 0, k = 0, look = new THREE.Vector3(0,0,24);
+var tr = new THREE.Vector3(-12,0,0), tl = new THREE.Vector3(12,0,0);
+var pilot, jsonModel;
+var xangle = 0, zangle = 0, angle;
+var sceneHUD, cameraHUD;
+var barA, barB;
+var changeV = false, origin = true;
+
+init();
+animate();
+
+function t3rdV(){
+	changeV = true;
+	origin = false;
+} 
+
+function globalV(){
+	changeV = false;
+	origin = false;
+} 
+
+function originalV(){
+	changeV = false;
+	origin = true;
+} 
+
+function initHUD() {
+    sceneHUD = new THREE.Scene();
+    cameraHUD = new THREE.OrthographicCamera(-10, 10, 10, -10, 1, 100);
+    cameraHUD.position.z = 5;
+    cameraHUD.lookAt(new THREE.Vector3(0, 0, 0));
+
+    barA = new THREE.Object3D();
+    powerA = new THREE.Mesh(new THREE.PlaneGeometry(1, 4),
+    new THREE.MeshBasicMaterial({
+        color: 0xff1233,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+        transparent: true
+    }));
+    powerA.position.set(-2, 2, 0);
+    barA.add(powerA);
+    sceneHUD.add(barA);
+
+    barB = new THREE.Object3D();
+    powerB = new THREE.Mesh(new THREE.PlaneGeometry(1, 4),
+    new THREE.MeshBasicMaterial({
+        color: 0x2212ff,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+        transparent: true
+    }));
+    powerB.position.set(2, 2, 0);
+    barB.add(powerB);
+    sceneHUD.add(barB);
+}
+
+
+function init() {
+	
+	initHUD();
+	
+	//Scene
+    scene = new THREE.Scene();
+    pilot = new THREE.Object3D();
+    //scene.add(pilot);
+	
+	THREE.ImageUtils.crossOrigin = '';
+	
+    renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x888888);
+		
+	
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.z = 500;
+    scene.add(camera);
+	
+	car();
+	floor();
+	light();
+		
+	renderer.shadowMapEnabled = true;
+	renderer.shadowMapType = THREE.PCFShadowMap;
+
+    control = new THREE.OrbitControls(camera, renderer.domElement);
+
+    document.body.appendChild(renderer.domElement);
+    window.addEventListener('resize', onWindowResize, false);	
+	
+	renderer.autoClear = false;
+
+	var jsonLoader = new THREE.JSONLoader();
+    jsonLoader.load("http://jyunming-chen.github.io/tutsplus/models/android.json", addModelToScene);
+}
+
+function addModelToScene(geometry, materials) {
+    var material = new THREE.MeshFaceMaterial(materials);
+    jsonModel = new THREE.Mesh(geometry, material);
+    jsonModel.scale.set(4, 4, 4);
+    jsonModel.rotation.y = Math.PI; // default: back face +z
+    pilot.add(jsonModel);
+}
+
+function light(){
+
+	light = new THREE.SpotLight( 0xffffff, 1.5 );
+	light.position.set( 0,200, 0 );
+	light.exponent = 100;
+	light.distance = 1000;
+	
+	light.castShadow = true;
+	light.shadowCameraNear = 50;
+	light.shadowCameraFar = camera.far;
+	light.shadowCameraFov = 50;  // in degrees
+	light.shadowBias = -0.00022;
+	light.shadowDarkness = 1;
+	light.shadowMapWidth = 2048;
+	light.shadowMapHeight = 2048;
+	scene.add( light );
+	light.target = car;
+}
+
+function floor(){
+
+	var floorTexture = new THREE.ImageUtils.loadTexture( 'image/wood.jpg' );
+	var floorMaterial = new THREE.MeshPhongMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+	var floorGeometry = new THREE.PlaneBufferGeometry(200, 200);
+	var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+	floor.rotation.x = Math.PI / 2;
+	
+	floor.castShadow = true;
+	floor.receiveShadow = true;
+	
+	scene.add(floor);
+}
+
+
+
+function createMesh(geom, imageFile, bump, wrap) 
+{
+	geom.computeVertexNormals();
+
+	var mat = new THREE.MeshPhongMaterial();
+	var texture = THREE.ImageUtils.loadTexture("image/" + imageFile);
+	
+	if(wrap) {
+		texture.wrapT = THREE.RepeatWrapping;
+		texture.wrapS = THREE.RepeatWrapping; 
+		//texture.repeat.set(8,1);
+	}
+	
+	mat.map = texture;
+	mat.side = THREE.DoubleSide;
+	mat.transparent = true;
+
+	if (bump) {
+		var bump = THREE.ImageUtils.loadTexture("image/" + bump);
+		mat.bumpMap = bump;
+		mat.bumpScale = 1;
+	}
+
+
+	var mesh = new THREE.Mesh(geom, mat);
+	mesh.castShadow = true;
+	mesh.receiveShadow = true;
+	return mesh;
+}
+
+function car(){
+	car = new THREE.Object3D();
+	tire();
+	carbody();
+    car.add (tireL);
+	car.add (tireR);
+	car.add (board);
+	scene.add (car);	
+}
+
+function carbody(){
+	board = new THREE.Object3D();
+	board.add( createMesh( new THREE.BoxGeometry(12, 3, 21), "ironboard.jpg" ) );
+	board.position.set (0,7,0);
+	board.rotation.y = Math.PI/2;
+	
+	body = new THREE.Object3D();
+	body.add( createMesh( new THREE.BoxGeometry(2.5, 60, 2.5), "iron.jpg" ) );
+	body.position.set (-4.5,30,0);
+	body.rotation.y = Math.PI*3/2;
+	board.add(body);
+	
+	boardlink = new THREE.Object3D();
+	boardlink.add( createMesh( new THREE.CylinderGeometry(2.2, 2.2, 4, 30), "ironhand.jpg" ) );
+	boardlink.position.set (0,-28,0);
+	boardlink.rotation.x = Math.PI/2;
+	body.add(boardlink);
+	
+	head = new THREE.Object3D();
+	head.add( createMesh( new THREE.BoxGeometry(9, 2.5, 3), "ironhand.jpg" ) );
+	head.position.set (0,30.5,0);
+	body.add(head);
+	
+	handL = new THREE.Object3D();
+	handL.add( createMesh( new THREE.CylinderGeometry(1, 1, 6, 30), "iron.jpg" ) );
+	handL.position.set (6,0,1);
+	handL.rotation.z = -Math.PI/2;
+	handL.rotation.y = -Math.PI/8;
+	head.add(handL);
+	
+	handR = handL.clone();
+	handR.position.set (-6,0,1);
+	handR.rotation.z = Math.PI/2;
+	handR.rotation.y = Math.PI/8;
+	head.add(handR);
+	
+	hand2L = new THREE.Object3D();
+	hand2L.add( createMesh( new THREE.CylinderGeometry(1.2, 1.2, 7, 30), "ironhand.jpg" ) );
+	hand2L.position.set (0,2.8,-2);
+	hand2L.rotation.x = Math.PI/2;
+	handL.add(hand2L);
+	
+	hand2R = new THREE.Object3D();
+	hand2R = hand2L.clone();
+	hand2R.position.set (0,2.8,-2);
+	hand2R.rotation.x = -Math.PI/2;
+	handR.add(hand2R);
+}
+
+function tire(){
+
+	tireL = new THREE.Object3D();
+
+    var mesh = createMesh( new THREE.CircleGeometry(10, 50), "tireside.png" );
+
+    var mesh2 = createMesh( new THREE.CylinderGeometry(10, 10, 3, 30, 1, true), "imgres.jpg", "", true) ;
+
+    mesh2.rotation.x = Math.PI / 2;
+    mesh.position.set(0, 0, 1.5);
+    mesh0 = mesh.clone();
+    mesh0.position.set(0, 0, -1.5);
+    mesh0.rotation.y = Math.PI;
+    tireL.add (mesh);
+    tireL.add(mesh0);
+    tireL.add(mesh2);
+	
+    tireL.position.set (-12,10,0);
+	tireL.rotation.y = Math.PI/2;    
+    
+	tireR = tireL.clone();
+	tireR.position.set (12,10,0);
+	tireR.rotation.y = Math.PI/2;
+
+}
+
+
+function update1(dt) {
+    var center = new THREE.Vector3();
+    var tmp = new THREE.Vector3();
+	var Ptmp = new THREE.Vector3();
+    var l = tmp.subVectors(tr, tl).length();
+
+    k = l * sa / (sb - sa);
+    var omega = (sb - sa) / l;
+    if (Math.abs(sa-sb) < 1e-5) {    // this gives better result (no jerk)
+    tmp.subVectors(tr, tl).normalize().cross(new THREE.Vector3(0, 1, 0)).multiplyScalar(sa * dt);
+        tr.add(tmp);
+        tl.add(tmp);
+
+        return; // do a pure translation then return
+    }
+
+    tmp.subVectors(tr, tl).normalize().multiplyScalar(k);
+    center.copy(tmp.add(tr));
+
+    tmp.subVectors(tr, center)
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), omega * dt)
+        .add(center);
+    tr.copy(tmp);
+
+    tmp.subVectors(tl, center)
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), omega * dt)
+        .add(center);
+    tl.copy(tmp);
+
+}
+
+
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+
+function myclamp(x,lo,hi)
+{
+	if (x < lo) return lo;
+	if (x > hi) return hi;
+	return x;
+}
+
+
+function animate() {
+	
+    if (keyboard.pressed("up")) { // move forward
+        xangle -= 0.01;
+    }
+    if (keyboard.pressed("down")) { // move backward
+        xangle += 0.01;
+    }
+    if (keyboard.pressed("left")) { // left turn
+        zangle += 0.005;
+    }
+    if (keyboard.pressed("right")) { // right turn
+        zangle -= 0.005;
+    }
+    if (keyboard.pressed("space")) { // pause
+        zangle = xangle = 0;
+    }
+
+    xangle = myclamp(xangle, -0.13, 0.1);
+    zangle = myclamp(zangle, -0.1, 0.1);
+	
+	body.translateOnAxis (new THREE.Vector3(0, 1, 0), -37);
+    board.rotation.x = -xangle;      
+    body.rotation.z = -zangle;
+	body.translateOnAxis (new THREE.Vector3(0, 1, 0), 37);
+	if(!changeV && !origin){
+	camera.setRotationFromAxisAngle(new THREE.Vector3(0, 1, 0), -zangle);
+	}
+	
+	
+    pilot.rotation.x = -xangle;      
+    pilot.rotation.z = -zangle;
+	
+    // compute Sa and Sb
+    var forward = -xangle * 200;
+    var small = forward * (1 - Math.abs(zangle) / 0.1 * 1.8);
+    if (zangle > 0) {
+        sa = small;
+        sb = forward;
+    } else {
+        sa = forward;
+        sb = small;
+    }
+
+    barA.scale.copy(new THREE.Vector3(1, Math.abs(sa/15), 1));
+    barB.scale.copy(new THREE.Vector3(1, Math.abs(sb/15), 1));
+
+    var xxa, xxb;
+
+    if (sa < 0) {
+        xxa = Math.PI;
+		tireL.rotation.x -= Math.abs(sa/250);
+        barA.children[0].material.color = new THREE.Color(0xffffff);
+    } else {
+        xxa = 0;
+		tireL.rotation.x += Math.abs(sa/250);
+        barA.children[0].material.color = new THREE.Color(0xff0000);
+    }
+    barA.rotation.x = xxa;
+
+    if (sb < 0) {
+        xxb = Math.PI;
+		tireR.rotation.x -= Math.abs(sb/250);
+        barB.children[0].material.color = new THREE.Color(0xffffff);
+    } else {
+        xxb = 0;
+		tireR.rotation.x += Math.abs(sb/250);
+        barB.children[0].material.color = new THREE.Color(0x0000ff);
+    }
+    barB.rotation.x = xxb;
+	
+	update();	
+	
+	if (car != undefined) car.scale.set (0.5,0.5,0.5);
+	
+
+	if(!changeV && !origin){
+    camera.position.set(car.position.x+60, car.position.y+90, car.position.z+100);
+	camera.up.set (0,1,0);
+	camera.lookAt(car.position);
+	}
+	else if(changeV && !origin){
+	/*
+	var m = new THREE.Matrix4();
+	var Tcar = new THREE.Vector3(car.position.x, car.position.y, car.position.z);
+	var temp = new THREE.Vector3();
+	
+	m.makeRotationY (angle);
+	//m.multiply (new THREE.Matrix4().makeTranslation(1,0,0));
+	Tcar.applyMatrix4(m);	
+	temp.copy(car.position);
+	temp.sub(Tcar);
+	
+	camera.position.set(temp);
+	
+	camera.up.set (0,1,0);
+	camera.lookAt(new THREE.Vector3(car.position.x, car.position.y, car.position.z-20));
+	*/
+	}
+
+	
+	requestAnimationFrame(animate);
+    render();
+}
+
+function update() {
+	keyboard.update();
+    control.update();
+
+    dt = 0.01;
+    update1(0.01);
+
+    var tmp = new THREE.Vector3();
+    tmp.copy(tr);
+    tmp.add(tl).multiplyScalar(0.5); // (tr+tl)/2
+    car.position.copy(tmp);
+    tmp.copy(tr);
+    tmp.sub(tl); // tr - tl;
+    angle = Math.atan2(tmp.z, tmp.x);
+	//console.log(car.position.x+6);
+    car.setRotationFromAxisAngle(new THREE.Vector3(0, 1, 0), -angle);	
+	//console.log(angle);
+
+} 
+
+function render() {
+
+    renderer.clear();
+	renderer.render(scene, camera);
+    renderer.render(sceneHUD, cameraHUD);
+	
+}
+</script>
+</body>
+
+</html>

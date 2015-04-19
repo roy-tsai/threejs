@@ -73,10 +73,6 @@ function init() {
 	floor();
 	light();
 		
-
-				
-	floor.castShadow = true; floor.receiveShadow = true;
-	car.castShadow = true; car.receiveShadow = true;
 	
 	renderer.shadowMapEnabled = true;
 	renderer.shadowMapType = THREE.PCFShadowMap;
@@ -85,6 +81,10 @@ function init() {
     control = new THREE.OrbitControls(camera, renderer.domElement);
     document.body.appendChild(renderer.domElement);
     window.addEventListener('resize', onWindowResize, false);
+	
+	tireL.traverse(function (mesh) {
+		if (mesh instanceof(THREE.Mesh)) mesh.castShadow = true;
+    });
 }
 
 function light(){
@@ -92,6 +92,8 @@ function light(){
 	light = new THREE.SpotLight( 0xffffff, 1.5 );
 	light.position.set( 0,200, 0 );
 	light.exponent = 100;
+	light.distance = 1000;
+	
 	light.castShadow = true;
 	light.shadowCameraNear = 50;
 	light.shadowCameraFar = camera.far;
@@ -111,6 +113,10 @@ function floor(){
 	var floorGeometry = new THREE.PlaneBufferGeometry(200, 200);
 	var floor = new THREE.Mesh(floorGeometry, floorMaterial);
 	floor.rotation.x = Math.PI / 2;
+	
+	floor.castShadow = true;
+	floor.receiveShadow = true;
+	
 	scene.add(floor);
 }
 
@@ -141,7 +147,8 @@ function createMesh(geom, imageFile, bump, wrap)
 
 
 	var mesh = new THREE.Mesh(geom, mat);
-
+	mesh.castShadow = true;
+	mesh.receiveShadow = true;
 	return mesh;
 }
 
