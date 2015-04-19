@@ -54,6 +54,7 @@ var xangle = 0, zangle = 0, angle;
 var sceneHUD, cameraHUD;
 var barA, barB;
 var changeV = false, origin = true;
+var meshR,x = 0;
 
 init();
 animate();
@@ -128,7 +129,9 @@ function init() {
 	car();
 	floor();
 	light();
-		
+	var jsonLoader = new THREE.JSONLoader();
+    jsonLoader.load("model/raptor.js", addModelToScene);	
+	
 	renderer.shadowMapEnabled = true;
 	renderer.shadowMapType = THREE.PCFShadowMap;
 
@@ -139,16 +142,37 @@ function init() {
 	
 	renderer.autoClear = false;
 
-	var jsonLoader = new THREE.JSONLoader();
-    jsonLoader.load("http://jyunming-chen.github.io/tutsplus/models/android.json", addModelToScene);
+
 }
 
 function addModelToScene(geometry, materials) {
-    var material = new THREE.MeshFaceMaterial(materials);
-    jsonModel = new THREE.Mesh(geometry, material);
-    jsonModel.scale.set(4, 4, 4);
-    jsonModel.rotation.y = Math.PI; // default: back face +z
-    pilot.add(jsonModel);
+		geometry.computeMorphNormals();
+
+		var mat = new THREE.MeshBasicMaterial(
+				{
+					//map: THREE.ImageUtils.loadTexture("models/skin.jpg"),
+					map: THREE.ImageUtils.loadTexture("model/strogg.png"),
+					morphTargets: true, morphNormals: true
+				});
+
+		meshR = new THREE.MorphAnimMesh(geometry, mat);
+
+
+		meshR.rotation.y = 0.7;
+		meshR.parseAnimations();
+
+		// parse the animations and add them to the control
+		/*var animLabels = [];
+		for (var key in mesh.geometry.animations) {
+			if (key === 'length' || !mesh.geometry.animations.hasOwnProperty(key)) continue;
+			animLabels.push(key);
+		}
+*/
+		meshR.playAnimation('stand', 10);
+		meshR.position.set (8,50,-3);
+		meshR.scale.set (1,2,0.8);
+		//mesh.rotation.z = -zangle;
+		board.add(meshR);
 }
 
 function light(){
@@ -351,22 +375,17 @@ function myclamp(x,lo,hi)
 
 
 function animate() {
+	x++;
 	
-    if (keyboard.pressed("up")) { // move forward
-        xangle -= 0.01;
-    }
-    if (keyboard.pressed("down")) { // move backward
-        xangle += 0.01;
-    }
-    if (keyboard.pressed("left")) { // left turn
-        zangle += 0.005;
-    }
-    if (keyboard.pressed("right")) { // right turn
-        zangle -= 0.005;
-    }
-    if (keyboard.pressed("space")) { // pause
-        zangle = xangle = 0;
-    }
+    if (keyboard.pressed("up")) xangle -= 0.01;
+    if (keyboard.pressed("down")) xangle += 0.01;
+
+    if (keyboard.pressed("left")) zangle += 0.005;
+
+    if (keyboard.pressed("right")) zangle -= 0.005;
+
+    if (keyboard.pressed("space")) zangle = xangle = 0;
+
 
     xangle = myclamp(xangle, -0.13, 0.1);
     zangle = myclamp(zangle, -0.1, 0.1);
@@ -374,11 +393,14 @@ function animate() {
 	body.translateOnAxis (new THREE.Vector3(0, 1, 0), -37);
     board.rotation.x = -xangle;      
     body.rotation.z = -zangle;
-	body.translateOnAxis (new THREE.Vector3(0, 1, 0), 37);
-	if(!changeV && !origin){
-	camera.setRotationFromAxisAngle(new THREE.Vector3(0, 1, 0), -zangle);
+	//console.log(x);
+	if(x >= 10){ 
+		meshR.translateOnAxis (new THREE.Vector3(0, 1, 0), -22);
+		meshR.rotation.x = zangle*2;
+		meshR.translateOnAxis (new THREE.Vector3(0, 1, 0), 22);
 	}
-	
+	body.translateOnAxis (new THREE.Vector3(0, 1, 0), 37);
+
 	
     pilot.rotation.x = -xangle;      
     pilot.rotation.z = -zangle;
@@ -424,7 +446,7 @@ function animate() {
 	update();	
 	
 	if (car != undefined) car.scale.set (0.5,0.5,0.5);
-	
+
 
 	if(!changeV && !origin){
     camera.position.set(car.position.x+60, car.position.y+90, car.position.z+100);
@@ -432,22 +454,29 @@ function animate() {
 	camera.lookAt(car.position);
 	}
 	else if(changeV && !origin){
-	/*
+	
 	var m = new THREE.Matrix4();
-	var Tcar = new THREE.Vector3(car.position.x, car.position.y, car.position.z);
+	var n = new THREE.Matrix4();
+	var Tcar = new THREE.Vector3();;
 	var temp = new THREE.Vector3();
 	
-	m.makeRotationY (angle);
+	//m.makeRotationY (Math.PI*3/2);
+	m.multiply (new THREE.Matrix4().makeRotationY (-angle-Math.PI));
+	m.multiply (new THREE.Matrix4().makeRotationY (-zangle));
+	n.makeRotationZ (-zangle);
 	//m.multiply (new THREE.Matrix4().makeTranslation(1,0,0));
-	Tcar.applyMatrix4(m);	
+		
 	temp.copy(car.position);
-	temp.sub(Tcar);
+	Tcar = new THREE.Vector3(car.position.x, car.position.y, car.position.z-30);
+	//temp.sub(Tcar);
+	//Tcar.applyMatrix4(m);
+	temp.applyMatrix4(n);
 	
-	camera.position.set(temp);
-	
+	camera.position.set(temp.x, temp.y+40, temp.z);
+	//console.log(car.position.x +" " +car.position.y +" " + car.position.z)
 	camera.up.set (0,1,0);
-	camera.lookAt(new THREE.Vector3(car.position.x, car.position.y, car.position.z-20));
-	*/
+	camera.lookAt(new THREE.Vector3(Tcar.x, Tcar.y, Tcar.z));
+
 	}
 
 	
@@ -469,14 +498,28 @@ function update() {
     tmp.copy(tr);
     tmp.sub(tl); // tr - tl;
     angle = Math.atan2(tmp.z, tmp.x);
-	//console.log(car.position.x+6);
+	//console.log(car.position.x +" " +car.position.y +" " + car.position.z);
     car.setRotationFromAxisAngle(new THREE.Vector3(0, 1, 0), -angle);	
-	//console.log(angle);
+	//console.log(car.position.x +" " +car.position.y +" " + car.position.z);\
+	
 
 } 
 
 function render() {
 
+	var delta = clock.getDelta();
+	
+	
+	if (meshR) {
+		// mesh.rotation.x+=0.006;
+		// mesh.rotation.y+=0.006;
+		//mesh.position.y = 25;
+		if (meshR) {
+			meshR.updateAnimation(delta * 1000);
+			// mesh.rotation.y+=0.01;
+		}
+	}
+	
     renderer.clear();
 	renderer.render(scene, camera);
     renderer.render(sceneHUD, cameraHUD);
