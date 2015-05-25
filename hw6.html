@@ -1,0 +1,400 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+	body {
+		background-color: #fff;
+		color: #111;
+		margin: 0px;
+		overflow: hidden;
+		font-family: Monospace;
+		font-size: 20px;
+		position: absolute;
+	}
+	
+	#info {
+		position: absolute;
+		top: 20px; width: 100%;
+		
+		padding: 5px;
+		text-align: center;
+		color: #ffff00
+	}
+	strong {color:red}
+	a {color: purple}
+	
+</style>
+</head>
+
+<body> 
+<div id="info">Hw6</div>
+
+<script id="myVertexShader" type="x-shader/x-vertex">
+    varying vec2 vUv;
+    void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vUv = uv;
+    }
+</script>
+<script id="myFragmentShader" type="x-shader/x-fragment">
+    uniform sampler2D texture;
+    varying vec2 vUv;
+
+    void main() {
+        vec4 color = texture2D (texture,vUv);
+        if (color.b > 0.7) 
+            discard;
+        else 
+            gl_FragColor = vec4(.2, .2, .2, 0.) + color;
+    }
+</script>
+<script type="x-shader/x-fragment" id="fragmentShaderDepth">
+    uniform sampler2D texture;
+    varying vec2 vUv;
+
+    vec4 pack_depth(const in float depth) {
+        const vec4 bit_shift = vec4(256.0 * 256.0 * 256.0, 256.0 * 256.0, 256.0, 1.0);
+        const vec4 bit_mask = vec4(0.0, 1.0 / 256.0, 1.0 / 256.0, 1.0 / 256.0);
+        vec4 res = fract(depth * bit_shift);
+        res -= res.xxyz * bit_mask;
+        return res;
+    }
+
+    void main() {
+        vec4 pixel = texture2D(texture, vUv);
+        if (pixel.b > 0.7) discard;
+        gl_FragData[0] = pack_depth(gl_FragCoord.z);
+    }
+</script>
+
+<audio id="BGM" autoplay loop style="display:none">
+<source src="sounds/Unstoppable.mp3" type='audio/mp3'>
+</audio>
+
+
+<script src="js/r69/three.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/KeyboardState.js"></script>
+
+<script>
+var clock = new THREE.Clock();
+var camera, scene, renderer, 
+    control, keyboard = new KeyboardState();	
+var floor;
+var jsonModel;
+var meshR,meshR2;
+var sceneRTT, rtTexture, teapot;
+var angle = 0,quad, plane;
+var quadArray = new Array(11);
+for (i = 0 ; i < 11 ; i++) {
+  quadArray[i] = new Array(11);
+}
+
+init();
+animate();
+
+
+function init() {
+
+	//SceneRTT
+    sceneRTT = new THREE.Scene();
+    light = new THREE.PointLight(0xffffff);
+    light.position.set(0, 300, 200);
+    sceneRTT.add(light);
+
+    rtTexture = new THREE.WebGLRenderTarget(
+    window.innerWidth, window.innerHeight, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.NearestFilter,
+        format: THREE.RGBFormat
+    });
+		
+	var jsonLoader = new THREE.JSONLoader();
+    jsonLoader.load("model/TRIS.js", addModelToScene);	
+	var jsonLoader2 = new THREE.JSONLoader();
+    jsonLoader2.load("model/devil.js", addModelToScene2);	
+
+	//Scene
+    scene = new THREE.Scene();
+	
+	THREE.ImageUtils.crossOrigin = '';
+	
+    renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x555555);
+		
+	
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.set(0,50,250);
+    scene.add(camera);
+
+	
+	floor();
+	lightF();
+	
+	
+	plane = new THREE.PlaneGeometry(100,100);
+    rttmaterial = new THREE.ShaderMaterial({
+		side: THREE.DoubleSide,
+        uniforms: {
+            texture: {
+                type: "t",
+                value: rtTexture
+            }
+        },
+        vertexShader: document.getElementById('myVertexShader').textContent,
+        fragmentShader: document.getElementById('myFragmentShader').textContent
+    });
+    quad = new THREE.Mesh( plane, rttmaterial );
+	//quad.position.set(0,20,0);
+	//scene.add(quad);
+    for (var i = 0; i <= 10; i++)
+    for (var j = 0; j <= 10; j++) {
+        quadArray[i][j] = quad.clone();
+        quadArray[i][j].position.set(20 * (i-5), 10, 20 * (j-5));
+		scene.add(quadArray[i][j]);
+    }	
+	
+	
+	// shadowing ///////////////
+    renderer.shadowMapEnabled = true;
+    renderer.shadowMapType = THREE.PCFShadowMap;
+
+    for (var i = 0; i <= 10; i++)
+    for (var j = 0; j <= 10; j++) {	
+    quadArray[i][j].castShadow = true;
+    quadArray[i][j].customDepthMaterial = new THREE.ShaderMaterial({
+        side: THREE.DoubleSide,
+        uniforms: {
+            texture: {
+                type: 't',
+                value: rtTexture
+            }
+        },
+        vertexShader: document.getElementById('myVertexShader').textContent,
+        fragmentShader: document.getElementById('fragmentShaderDepth').textContent
+    });
+	}
+		
+
+
+
+    control = new THREE.OrbitControls(camera, renderer.domElement);
+
+    document.body.appendChild(renderer.domElement);
+    window.addEventListener('resize', onWindowResize, false);	
+
+}
+
+function addModelToScene(geometry, materials) {
+		geometry.computeMorphNormals();
+
+		var mat = new THREE.MeshBasicMaterial(
+				{
+					//map: THREE.ImageUtils.loadTexture("models/skin.jpg"),
+					map: THREE.ImageUtils.loadTexture("model/Hueteotl.png"),
+					morphTargets: true, morphNormals: true
+				});
+
+		meshR = new THREE.MorphAnimMesh(geometry, mat);
+
+
+		meshR.rotation.y = Math.PI/2;
+		meshR.parseAnimations();
+
+		// parse the animations and add them to the control
+		/*var animLabels = [];
+		for (var key in mesh.geometry.animations) {
+			if (key === 'length' || !mesh.geometry.animations.hasOwnProperty(key)) continue;
+			animLabels.push(key);
+		}
+*/
+		meshR.playAnimation('run', 10);
+		//meshR.position.set (8,50,-3);
+		meshR.scale.set (2,1,2);
+		//mesh.rotation.z = -zangle;
+		sceneRTT.add(meshR);
+		
+}
+
+function addModelToScene2(geometry, materials) {
+		geometry.computeMorphNormals();
+
+		var mat = new THREE.MeshBasicMaterial(
+				{
+					//map: THREE.ImageUtils.loadTexture("models/skin.jpg"),
+					map: THREE.ImageUtils.loadTexture("model/devilP.png"),
+					morphTargets: true, morphNormals: true
+				});
+
+		meshR2 = new THREE.MorphAnimMesh(geometry, mat);
+
+
+		meshR2.rotation.y = Math.PI/2;
+		meshR2.parseAnimations();
+
+		// parse the animations and add them to the control
+		/*var animLabels = [];
+		for (var key in mesh.geometry.animations) {
+			if (key === 'length' || !mesh.geometry.animations.hasOwnProperty(key)) continue;
+			animLabels.push(key);
+		}
+*/	
+		
+		meshR2.playAnimation('run', 10);
+		meshR2.position.set (0,11,150);
+		meshR2.scale.set (0.5,0.5,0.5);
+		//meshR2.rotation.y = Math.PI/2*3;
+		meshR2.castShadow = true;
+		scene.add(meshR2);
+		
+}
+
+function lightF(){
+
+	light = new THREE.SpotLight( 0xffffff, 8 );
+	light.position.set( 0,450, 500 );
+	light.exponent = 100;
+	light.distance = 1000;
+	
+	light.castShadow = true;
+	light.shadowCameraNear = 50;
+	light.shadowCameraFar = camera.far;
+	light.shadowCameraFov = 50;  // in degrees
+	light.shadowBias = -0.00022;
+	light.shadowDarkness = 1;
+	light.shadowMapWidth = 2048;
+	light.shadowMapHeight = 2048;
+	scene.add( light );
+	
+}
+
+function floor(){
+
+
+	var floorGeometry = new THREE.PlaneBufferGeometry(350, 350);
+	var floor = new THREE.Object3D();
+	floor.add(createMesh(floorGeometry , 'fireGround.jpg', 'fireGround.jpg'));
+	floor.rotation.x = Math.PI / 2;
+	
+	floor.castShadow = true;
+	floor.receiveShadow = true;
+	
+	scene.add(floor);
+}
+
+
+
+function createMesh(geom, imageFile, bump, wrap) 
+{
+	geom.computeVertexNormals();
+
+	var mat = new THREE.MeshPhongMaterial();
+	var texture = THREE.ImageUtils.loadTexture("image/" + imageFile);
+	
+	if(wrap) {
+		texture.wrapT = THREE.RepeatWrapping;
+		texture.wrapS = THREE.RepeatWrapping; 
+		//texture.repeat.set(8,1);
+	}
+	
+	mat.map = texture;
+	mat.side = THREE.DoubleSide;
+	//mat.transparent = true;
+
+	if (bump) {
+		var bump = THREE.ImageUtils.loadTexture("image/" + bump);
+		mat.bumpMap = bump;
+		mat.bumpScale = 1;
+	}
+
+
+	var mesh = new THREE.Mesh(geom, mat);
+	mesh.castShadow = true;
+	mesh.receiveShadow = true;
+	return mesh;
+}
+
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+
+function animate() {
+
+	
+	update();	
+    //angle += 0.02;
+    for (var i = -5; i <= 5; i++)
+    for (var j = -5; j <= 5; j++) {
+     //  quad[i][j].position.set(20 * i, 20, 20 * j);
+      rotateBillboard (quadArray[i+5][j+5]);
+
+    }
+//	rotateBillboard (quad);	
+	requestAnimationFrame(animate);
+    render();
+}
+
+function update() {
+	keyboard.update();
+    control.update();
+	
+
+} 
+
+function rotateBillboard (mesh)
+{
+    var b = mesh.position.clone();  // billboard location
+    var rotaxis = new THREE.Vector3();
+    var v, yhat, n;
+    
+    v = camera.position.clone(); // clone the camera position
+    yhat = new THREE.Vector3(0, 1, 0); // up
+    n = new THREE.Vector3(0, 0, 1); // billboard normal
+
+    v.subVectors(v, b); // v-b
+    v.sub(yhat.clone().multiplyScalar(v.dot(yhat)));
+    v.normalize(); // pxz
+
+    rotangle = Math.acos(v.dot(n));
+    rotaxis.crossVectors(n, v);
+    if (rotaxis.dot(yhat) < 0) rotangle *= -1;
+
+    mesh.rotation.y = rotangle;
+}
+
+
+function render() {
+
+	var delta = clock.getDelta();
+	
+	
+	if (meshR) {
+		if (meshR) {
+			meshR.updateAnimation(delta * 300);
+		}
+	}
+	if (meshR2) {
+		if (meshR2) {
+			meshR2.updateAnimation(delta * 300);
+		}
+	}
+	
+	// render teapot to texture
+    renderer.setClearColor(0x0000ff);
+    renderer.render(sceneRTT, camera, rtTexture, true);
+
+    // render texture to screne
+    renderer.setClearColor(0x000000);
+	renderer.render(scene, camera);
+	
+}
+</script>
+</body>
+
+</html>
